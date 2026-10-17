@@ -41,6 +41,7 @@ require APP_ROOT . '/src/auth.php';
 require APP_ROOT . '/src/validation.php';
 require APP_ROOT . '/src/upload.php';
 require APP_ROOT . '/src/audit.php';
+require APP_ROOT . '/src/pins.php';
 
 set_exception_handler(static function (Throwable $e): void {
     error_log('[mozaic] Uncaught ' . get_class($e) . ': ' . $e->getMessage()
