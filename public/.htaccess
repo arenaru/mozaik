@@ -1,0 +1,11 @@
+# Fallback for non-Docker setups. The Docker vhost sets AllowOverride None and ignores this.
+Options -Indexes
+ServerSignature Off
+
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+
+<IfModule mod_headers.c>
+    Header always unset X-Powered-By
+</IfModule>

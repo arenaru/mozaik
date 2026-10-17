@@ -1,0 +1,15 @@
+# Secrets
+.env
+config/config.php
+
+# User uploads (only the protective .htaccess is tracked)
+public/uploads/*
+!public/uploads/.htaccess
+
+# Logs / OS / editor
+*.log
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
