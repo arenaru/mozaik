@@ -143,6 +143,37 @@ img { max-width: 100%; display: block; }
 .radio-group { border: none; padding: 0; margin: 0; display: grid; gap: .4rem; }
 .radio-group legend { font-weight: 600; margin-bottom: .3rem; }
 
+/* Profile */
+.profile-header { text-align: center; margin: 1rem 0 1.5rem; }
+.profile-header h1 { margin: .5rem 0 0; overflow-wrap: anywhere; }
+.profile-bio { max-width: 560px; margin: .5rem auto; overflow-wrap: anywhere; }
+.avatar-lg { width: 120px; height: 120px; margin: 0 auto; }
+.badge-danger { background: #fde8e8; color: #7a1010; }
+
+.board-grid {
+    list-style: none; padding: 0; margin: 0;
+    display: grid; gap: 1.25rem;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+.board-card { display: grid; gap: .2rem; text-decoration: none; }
+.board-card strong { overflow-wrap: anywhere; }
+.board-cover { display: block; aspect-ratio: 3 / 2; border-radius: var(--radius); background: var(--surface); overflow: hidden; }
+.board-cover img { width: 100%; height: 100%; object-fit: cover; }
+
+/* Admin */
+.admin-head { text-align: center; }
+.admin-head h1 { margin-bottom: .5rem; }
+.admin-filter { display: flex; flex-wrap: wrap; gap: .75rem; align-items: flex-end; justify-content: center; margin-bottom: 1.5rem; }
+.admin-filter label { display: grid; gap: .2rem; font-weight: 600; font-size: .9rem; }
+.admin-filter input, .admin-filter select { font: inherit; padding: .45rem .6rem; border: 2px solid var(--border); border-radius: 10px; }
+.table-wrap { overflow-x: auto; }
+.admin-table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+.admin-table th, .admin-table td { padding: .55rem .6rem; border-bottom: 1px solid var(--surface); text-align: left; vertical-align: top; }
+.admin-table th { background: #fafafa; }
+.admin-table .wrap { overflow-wrap: anywhere; max-width: 360px; }
+.admin-table .nowrap { white-space: nowrap; }
+.admin-table .ua { color: var(--muted); max-width: 220px; overflow-wrap: anywhere; }
+
 .btn-danger { background: #b00020; color: #fff; }
 .btn-danger:hover { background: #8a0019; }
 
