@@ -1,0 +1,48 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/app/Dockerfile
+    ports:
+      # Bound to loopback only; not reachable from other machines on the network.
+      - "127.0.0.1:8080:80"
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      APP_URL: ${APP_URL:-http://localhost:8080}
+      COOKIE_SECURE: ${COOKIE_SECURE:-0}
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_NAME: ${MYSQL_DATABASE:?set MYSQL_DATABASE in .env}
+      DB_USER: ${APP_DB_USER:?set APP_DB_USER in .env}
+      DB_PASS: ${APP_DB_PASSWORD:?set APP_DB_PASSWORD in .env}
+    volumes:
+      # Source code is mounted read-only: a compromised PHP process cannot modify the app.
+      - ./:/var/www/html:ro
+      # Uploads live in a separate writable volume.
+      - uploads:/var/www/html/public/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: mysql:8.4
+    # No "ports:" on purpose: the database is only reachable from the app container.
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in .env}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      APP_DB_USER: ${APP_DB_USER}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD}
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    volumes:
+      - dbdata:/var/lib/mysql
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./database/init/02-app-user.sh:/docker-entrypoint-initdb.d/02-app-user.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  dbdata:
+  uploads:
