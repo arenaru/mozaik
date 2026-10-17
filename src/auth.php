@@ -19,25 +19,28 @@ function hash_password(string $password): string
 
 /**
  * Verify a password and transparently upgrade the hash if the algorithm/cost changed.
+ * $hash is updated in place when a rehash happens, so callers can pass the
+ * current hash on to login_user().
  */
-function verify_password(string $password, string $hash, ?int $userId = null): bool
+function verify_password(string $password, string &$hash, ?int $userId = null): bool
 {
     if (!password_verify($password, $hash)) {
         return false;
     }
     $algo = defined('PASSWORD_ARGON2ID') ? PASSWORD_ARGON2ID : PASSWORD_DEFAULT;
     if ($userId !== null && password_needs_rehash($hash, $algo)) {
-        db_query('UPDATE users SET password_hash = ? WHERE id = ?', [hash_password($password), $userId]);
+        $hash = hash_password($password);
+        db_query('UPDATE users SET password_hash = ? WHERE id = ?', [$hash, $userId]);
     }
     return true;
 }
 
-/** Hash used to keep login timing constant when the username does not exist. */
-function dummy_password_hash(): string
-{
-    static $hash = null;
-    return $hash ??= hash_password('dummy-password-for-timing');
-}
+/**
+ * Precomputed Argon2id hash (same cost as real hashes) of a random throwaway string.
+ * Verified against when the account doesn't exist or is locked, so response time
+ * doesn't reveal which accounts exist.
+ */
+const DUMMY_PASSWORD_HASH = '$argon2id$v=19$m=65536,t=4,p=1$Qm01SnBqVk9NOHpUTURoNg$sW8msJ7v001yKPw7XEHZ1GG8TmnTnJWCaUV/IvL2RcM';
 
 /** @return array<string,mixed>|null */
 function current_user(): ?array
@@ -55,13 +58,18 @@ function current_user(): ?array
         return null;
     }
 
-    $row = db_query('SELECT ' . PUBLIC_USER_COLUMNS . ' FROM users WHERE id = ?', [$id])->fetch();
-    if (!$row || (int) $row['is_active'] !== 1) {
-        // Deleted or blocked while logged in: kill the session.
+    $row = db_query('SELECT ' . PUBLIC_USER_COLUMNS . ', password_hash FROM users WHERE id = ?', [$id])->fetch();
+    $fingerprint = $_SESSION['pw_fp'] ?? '';
+    if (!$row
+        || (int) $row['is_active'] !== 1
+        // Password changed elsewhere: sessions created with the old password are invalid.
+        || !is_string($fingerprint)
+        || !hash_equals(password_fingerprint($row['password_hash']), $fingerprint)) {
         logout_user();
         return null;
     }
 
+    unset($row['password_hash']); // never keep the hash around in page code
     return $user = $row;
 }
 
@@ -115,12 +123,72 @@ function require_owner(int|string $ownerId): void
     }
 }
 
+/**
+ * Short, keyed-free fingerprint of the stored hash. Stored in the session so that
+ * changing the password invalidates every other session (the hash changes).
+ * The full hash is never put in the session.
+ */
+function password_fingerprint(string $passwordHash): string
+{
+    return substr(hash('sha256', $passwordHash), 0, 16);
+}
+
+/**
+ * Look up a user by username OR email for login.
+ * @return array<string,mixed>|null
+ */
+function find_user_for_login(string $identifier): ?array
+{
+    if ($identifier === '' || strlen($identifier) > 255) {
+        return null;
+    }
+    $row = db_query(
+        'SELECT id, username, password_hash, is_active, failed_login_count, locked_until,
+                (locked_until IS NOT NULL AND locked_until > UTC_TIMESTAMP()) AS is_locked
+           FROM users
+          WHERE username = ? OR email = ?
+          LIMIT 1',
+        [$identifier, $identifier]
+    )->fetch();
+    return $row ?: null;
+}
+
+/**
+ * Re-authenticate the logged-in user (settings: change email/password, delete account).
+ * If the hash gets upgraded during verification, the session fingerprint is updated
+ * so the current session stays valid.
+ */
+function verify_current_password(int $userId, string $password): bool
+{
+    $hash = db_query('SELECT password_hash FROM users WHERE id = ?', [$userId])->fetchColumn();
+    if (!is_string($hash)) {
+        return false;
+    }
+    $original = $hash;
+    if (!verify_password($password, $hash, $userId)) {
+        return false;
+    }
+    if ($hash !== $original) {
+        $_SESSION['pw_fp'] = password_fingerprint($hash);
+    }
+    return true;
+}
+
 /** Call after a successful password check. */
-function login_user(int $userId): void
+function login_user(int $userId, string $passwordHash): void
 {
     session_regenerate_id(true); // prevent session fixation
     $_SESSION['user_id'] = $userId;
+    $_SESSION['pw_fp'] = password_fingerprint($passwordHash);
     $_SESSION['login_at'] = time();
+    csrf_rotate();
+}
+
+/** After this user changes their own password: keep THIS session, kill all others. */
+function refresh_session_after_password_change(string $newPasswordHash): void
+{
+    session_regenerate_id(true);
+    $_SESSION['pw_fp'] = password_fingerprint($newPasswordHash);
     csrf_rotate();
 }
 

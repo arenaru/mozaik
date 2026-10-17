@@ -79,7 +79,11 @@ view('header', ['title' => $pin['title']]);
 | `db_query($sql, $params)` | Prepared statement; ints bound as `PARAM_INT` |
 | `csrf_field()` / `csrf_verify()` | CSRF token in forms / check in POST handlers |
 | `current_user()`, `require_login()`, `require_admin()`, `require_owner($id)` | Authn/authz |
-| `login_user($id)` / `logout_user()` | Session regeneration + CSRF rotation |
+| `login_user($id, $hash)` / `logout_user()` | Session regeneration + CSRF rotation + password fingerprint |
+| `verify_current_password($id, $pw)` | Re-auth for sensitive settings |
+| `input_raw($k)` | Untrimmed input (passwords) |
+| `field_error($errors, $f)` / `field_aria($errors, $f)` | Accessible per-field errors |
+| `reject_oversized_post()` | 413 instead of a confusing CSRF error on huge uploads |
 | `hash_password()` / `verify_password()` | Argon2id, with auto-rehash |
 | `input($k)`, `input_int($k)` | Scalar-only request input |
 | `v_length`, `v_username`, `v_email`, `v_password`, `v_in`, `v_url_optional` | Validators (return error or null) |
@@ -99,6 +103,14 @@ view('header', ['title' => $pin['title']]);
 - Uploads cannot execute PHP and only serve random-hex image filenames, sandboxed by CSP
 - Code is mounted read-only into the container. Only the uploads volume is writable
 - The DB port is not published. The app binds to `127.0.0.1` only
+
+## Auth behaviour
+
+- Login accepts a username or an email. Every failure (unknown user, wrong password, locked, blocked) returns the same message, and each one runs one Argon2id verify so response time doesn't reveal which case happened
+- After 5 failed attempts the account is locked for 15 minutes. The counter update is a single atomic `UPDATE`. While locked, the real password isn't checked at all
+- Changing the password logs out every other session, because each session stores a fingerprint of the password hash. The current session stays logged in
+- Changing email, changing password and deleting the account all require the current password. The last active admin can't delete their own account
+- **Accepted risk:** the per-account lockout can be abused to lock out a known user (DoS). Mitigations such as per-IP throttling or CAPTCHA are out of scope
 
 ## Definition of Done (per feature)
 

@@ -21,7 +21,7 @@ function csrf_field(): string
     return '<input type="hidden" name="csrf_token" value="' . e(csrf_token()) . '">';
 }
 
-/** Abort with 419 if the submitted token is missing or wrong. */
+/** Abort with 403 if the submitted token is missing or wrong. */
 function csrf_verify(): void
 {
     $submitted = $_POST['csrf_token'] ?? '';
@@ -30,7 +30,8 @@ function csrf_verify(): void
     if (!is_string($submitted) || !is_string($expected) || $expected === ''
         || !hash_equals($expected, $submitted)) {
         error_log('[mozaic] CSRF token mismatch from ' . client_ip());
-        abort(419);
+        // 403, not 419: Apache turns non-standard status codes into a 500.
+        abort(403, 'Your session expired or the form is invalid. Please go back, reload the page and try again.');
     }
 }
 
