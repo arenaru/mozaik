@@ -9,7 +9,11 @@ require __DIR__ . '/../src/bootstrap.php';
 
 $limit = 30;
 $pins = db_query(
-    'SELECT id, title, image_path FROM pins ORDER BY created_at DESC, id DESC LIMIT ?',
+    'SELECT p.id, p.title, p.image_path
+       FROM pins p
+       JOIN users u ON u.id = p.user_id AND u.is_active = 1
+      ORDER BY p.created_at DESC, p.id DESC
+      LIMIT ?',
     [$limit]
 )->fetchAll();
 
